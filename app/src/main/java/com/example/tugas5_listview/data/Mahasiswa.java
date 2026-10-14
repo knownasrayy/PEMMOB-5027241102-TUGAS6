@@ -13,6 +13,7 @@ public class Mahasiswa {
     private String jurusan;
     private int angkatan;
     private String timestamp;
+    private String fotoPath;
 
     public Mahasiswa() {}
 
@@ -46,4 +47,8 @@ public class Mahasiswa {
 
     public String getTimestamp() { return timestamp; }
     public void setTimestamp(String timestamp) { this.timestamp = timestamp; }
+
+    /** Path absolut file foto profil hasil kamera (null bila belum ada foto). */
+    public String getFotoPath() { return fotoPath; }
+    public void setFotoPath(String fotoPath) { this.fotoPath = fotoPath; }
 }

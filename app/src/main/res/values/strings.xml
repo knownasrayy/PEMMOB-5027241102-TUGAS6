@@ -66,4 +66,5 @@
     <string name="menu_sort_oldest">Terlama</string>
     <string name="menu_sort_name_asc">Nama (A - Z)</string>
     <string name="menu_sort_nim_asc">NRP (Terkecil)</string>
+    <string name="menu_camera_lab">Lab Kamera</string>
 </resources>

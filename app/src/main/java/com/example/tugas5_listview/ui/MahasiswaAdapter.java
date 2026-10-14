@@ -1,6 +1,7 @@
 package com.example.tugas5_listview.ui;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,13 +14,16 @@ import androidx.annotation.Nullable;
 
 import com.example.tugas5_listview.R;
 import com.example.tugas5_listview.data.Mahasiswa;
+import com.example.tugas5_listview.util.ImageUtils;
+import com.google.android.material.imageview.ShapeableImageView;
 
 import java.util.List;
 
 /**
- * MahasiswaAdapter â€” Custom ArrayAdapter dengan penerapan resmi ViewHolder Pattern (Pertemuan 5).
+ * MahasiswaAdapter - Custom ArrayAdapter dengan ViewHolder Pattern (P05) + Foto Kamera (Materi Kamera).
+ *
  * Mengoptimalkan daur ulang baris ListView (View Recycling) dengan cache findViewById() via setTag()/getTag().
- * Mendukung aksi klik baris, tombol edit langsung, tombol telepon cepat, dan klik lama.
+ * Menampilkan thumbnail foto kamera jika ada, atau monogram inisial nama jika belum berfoto.
  */
 public class MahasiswaAdapter extends ArrayAdapter<Mahasiswa> {
 
@@ -30,12 +34,9 @@ public class MahasiswaAdapter extends ArrayAdapter<Mahasiswa> {
         void onItemLongClick(Mahasiswa mhs);
     }
 
-    /**
-     * ViewHolder Pattern (Materi Inti P05 Bagian 5):
-     * Mencegah pemanggilan findViewById() berulang saat scrolling ListView.
-     */
     private static class ViewHolder {
         TextView tvAvatarInitial;
+        ShapeableImageView ivFoto;
         TextView tvNama;
         TextView tvNim;
         TextView tvNoHp;
@@ -58,13 +59,13 @@ public class MahasiswaAdapter extends ArrayAdapter<Mahasiswa> {
         final Mahasiswa m = getItem(position);
         ViewHolder holder;
 
-        // View Recycling: Hanya buat view baru jika convertView == null
         if (convertView == null) {
             convertView = LayoutInflater.from(getContext())
                     .inflate(R.layout.item_mahasiswa, parent, false);
 
             holder = new ViewHolder();
             holder.tvAvatarInitial = convertView.findViewById(R.id.tv_avatar_initial);
+            holder.ivFoto          = convertView.findViewById(R.id.iv_mhs_foto);
             holder.tvNama          = convertView.findViewById(R.id.tv_mhs_nama);
             holder.tvNim           = convertView.findViewById(R.id.tv_mhs_nim);
             holder.tvNoHp          = convertView.findViewById(R.id.tv_mhs_nohp);
@@ -73,10 +74,8 @@ public class MahasiswaAdapter extends ArrayAdapter<Mahasiswa> {
             holder.btnQuickEdit    = convertView.findViewById(R.id.btn_quick_edit);
             holder.btnQuickCall    = convertView.findViewById(R.id.btn_quick_call);
 
-            // Simpan referensi ViewHolder ke tag view (cache)
             convertView.setTag(holder);
         } else {
-            // Ambil referensi dari cache (tanpa findViewById ulang!)
             holder = (ViewHolder) convertView.getTag();
         }
 
@@ -87,40 +86,44 @@ public class MahasiswaAdapter extends ArrayAdapter<Mahasiswa> {
             holder.tvJurusan.setText(m.getJurusan());
             holder.tvAngkatan.setText("Angkatan " + m.getAngkatan());
 
-            // Monogram Avatar ITS (mis. "R" untuk Rayhan)
+            // Tampilkan foto dari kamera jika tersedia; jika tidak, tampilkan monogram inisial
+            if (ImageUtils.isValidPhoto(m.getFotoPath())) {
+                Bitmap thumb = ImageUtils.loadThumbnail(m.getFotoPath(), 144);
+                if (thumb != null) {
+                    holder.ivFoto.setImageBitmap(thumb);
+                    holder.ivFoto.setVisibility(View.VISIBLE);
+                    holder.tvAvatarInitial.setVisibility(View.GONE);
+                } else {
+                    holder.ivFoto.setVisibility(View.GONE);
+                    holder.tvAvatarInitial.setVisibility(View.VISIBLE);
+                }
+            } else {
+                holder.ivFoto.setVisibility(View.GONE);
+                holder.tvAvatarInitial.setVisibility(View.VISIBLE);
+            }
+
+            // Monogram inisial nama
             if (m.getNama() != null && !m.getNama().trim().isEmpty()) {
                 holder.tvAvatarInitial.setText(m.getNama().trim().substring(0, 1).toUpperCase());
             } else {
                 holder.tvAvatarInitial.setText("M");
             }
 
-            // Klik Kartu Utama -> Buka Dialog Profil & Aksi Lengkap
             convertView.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onItemClick(m);
-                }
+                if (listener != null) listener.onItemClick(m);
             });
 
-            // Klik Lama Kartu -> Dialog Konfirmasi Hapus
             convertView.setOnLongClickListener(v -> {
-                if (listener != null) {
-                    listener.onItemLongClick(m);
-                }
+                if (listener != null) listener.onItemLongClick(m);
                 return true;
             });
 
-            // Tombol Edit Cepat Langsung di Kartu
             holder.btnQuickEdit.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onEditClick(m);
-                }
+                if (listener != null) listener.onEditClick(m);
             });
 
-            // Tombol Quick Call di sisi kanan kartu
             holder.btnQuickCall.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onQuickCall(m);
-                }
+                if (listener != null) listener.onQuickCall(m);
             });
         }
 

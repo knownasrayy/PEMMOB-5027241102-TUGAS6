@@ -1,7 +1,9 @@
 package com.example.tugas5_listview.ui;
 
+import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
@@ -11,13 +13,17 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.SearchView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
@@ -25,18 +31,26 @@ import androidx.appcompat.widget.Toolbar;
 import com.example.tugas5_listview.R;
 import com.example.tugas5_listview.data.Mahasiswa;
 import com.example.tugas5_listview.data.MahasiswaRepository;
+import com.example.tugas5_listview.util.CameraPermissionHelper;
+import com.example.tugas5_listview.util.ImageUtils;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
+import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.textfield.TextInputLayout;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * MainActivity â€” Capstone Buku Kontak Mahasiswa ITS (Pertemuan 5).
+ * MainActivity - Capstone Buku Kontak Mahasiswa ITS + Fitur Kamera Profil.
+ *
  * Mengintegrasikan ListView, Custom ArrayAdapter + ViewHolder, Input Dialog (AlertDialog),
- * Quick Intent (Dial/SMS), dan persistensi SQLite penuh.
+ * Quick Intent (Dial/SMS), Foto Profil dari Kamera (FileProvider + ACTION_IMAGE_CAPTURE),
+ * dan persistensi SQLite penuh.
  */
 public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.OnMahasiswaItemListener {
 
@@ -57,6 +71,16 @@ public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.
     private String currentSort = "newest";
     private String currentSearch = "";
 
+    // State kamera untuk dialog form aktif
+    private String formPhotoPath = null;
+    private String initialFormPhotoPath = null;
+    private ShapeableImageView formImageView = null;
+    private TextView formInitialView = null;
+    private MaterialButton formBtnRemovePhoto = null;
+
+    private ActivityResultLauncher<Uri> formCameraLauncher;
+    private ActivityResultLauncher<String> formPermissionLauncher;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -75,11 +99,9 @@ public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.
         currentSort = prefs.getString(PREF_SORT_KEY, "newest");
         repository  = new MahasiswaRepository(this);
 
-        // â”€â”€ Pemasangan Adapter ke ListView dengan Callback Lengkap (P5 Section 4.3) â”€â”€
         adapter = new MahasiswaAdapter(this, listData, this);
         listView.setAdapter(adapter);
 
-        // Listener cadangan pada ListView
         listView.setOnItemClickListener((parent, view, position, id) -> {
             Mahasiswa mhs = adapter.getItem(position);
             if (mhs != null) {
@@ -95,13 +117,41 @@ public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.
             return true;
         });
 
-        // â”€â”€ Tombol Tambah FAB: Memunculkan Dialog Input Tambah Kontak (P5 Section 6 & 7) â”€â”€
         fabAdd.setOnClickListener(v -> showFormDialog(null));
 
         View btnEmptyAdd = findViewById(R.id.btn_empty_add);
         if (btnEmptyAdd != null) {
             btnEmptyAdd.setOnClickListener(v -> showFormDialog(null));
         }
+
+        registerFormCameraLaunchers();
+    }
+
+    private void registerFormCameraLaunchers() {
+        // Menangkap hasil kamera untuk dialog form
+        formCameraLauncher = registerForActivityResult(new ActivityResultContracts.TakePicture(), success -> {
+            if (success && formPhotoPath != null) {
+                updateFormPhotoUi(formPhotoPath);
+                Toast.makeText(this, "Foto profil berhasil diambil dari kamera", Toast.LENGTH_SHORT).show();
+            } else {
+                // Pengambilan foto dibatalkan: bersihkan file kosong baru
+                if (formPhotoPath != null && !formPhotoPath.equals(initialFormPhotoPath)) {
+                    ImageUtils.deleteQuietly(formPhotoPath);
+                }
+                formPhotoPath = initialFormPhotoPath;
+                updateFormPhotoUi(formPhotoPath);
+            }
+        });
+
+        formPermissionLauncher = registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+            if (granted) {
+                launchFormCamera();
+            } else if (!CameraPermissionHelper.shouldShowRationale(this)) {
+                CameraPermissionHelper.showSettingsDialog(this);
+            } else {
+                Toast.makeText(this, "Izin kamera diperlukan untuk mengambil foto profil", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @Override
@@ -124,16 +174,13 @@ public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.
         repository.close();
     }
 
-    // â”€â”€ Callback dari OnMahasiswaItemListener â”€â”€
     @Override
     public void onItemClick(Mahasiswa mhs) {
-        // Klik pada kartu -> Tampilkan profil detail lengkap dengan tombol Edit & Telepon
         showDetailActionDialog(mhs);
     }
 
     @Override
     public void onEditClick(Mahasiswa mhs) {
-        // Klik tombol Edit langsung pada kartu -> Buka dialog form edit dengan data terisi!
         showFormDialog(mhs);
     }
 
@@ -147,9 +194,6 @@ public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.
         showDeleteConfirmationDialog(mhs);
     }
 
-    /**
-     * Memuat data kontak dari SQLite ke ListView (P5 Section 8.3).
-     */
     private void muatDataDariDatabase() {
         List<Mahasiswa> result;
         if (currentSearch.isEmpty()) {
@@ -158,14 +202,12 @@ public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.
             result = repository.search(currentSearch, currentSort);
         }
 
-        // Perbarui data adapter
         adapter.clear();
         if (result != null && !result.isEmpty()) {
             adapter.addAll(result);
         }
         adapter.notifyDataSetChanged();
 
-        // Tampilan empty state vs list
         if (adapter.isEmpty()) {
             listView.setVisibility(View.GONE);
             if (cardHero != null) cardHero.setVisibility(View.GONE);
@@ -187,9 +229,8 @@ public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.
         }
     }
 
-    /**
-     * Dialog Input (Tambah / Edit Kontak) dengan AlertDialog + LayoutInflater (P5 Section 6).
-     */
+    // ---------------------------------------------------------------- Dialog Form Input + Foto Kamera
+
     public void showFormDialog(final Mahasiswa existingMhs) {
         final boolean isEdit = (existingMhs != null);
 
@@ -207,13 +248,43 @@ public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.
         final EditText etJurusan  = viewInput.findViewById(R.id.et_dialog_jurusan);
         final EditText etAngkatan = viewInput.findViewById(R.id.et_dialog_angkatan);
 
+        // Bind widget foto form
+        formImageView       = viewInput.findViewById(R.id.iv_form_foto);
+        formInitialView     = viewInput.findViewById(R.id.tv_form_avatar_initial);
+        formBtnRemovePhoto  = viewInput.findViewById(R.id.btn_form_remove_photo);
+        MaterialButton btnTake = viewInput.findViewById(R.id.btn_form_take_photo);
+
+        initialFormPhotoPath = isEdit ? existingMhs.getFotoPath() : null;
+        formPhotoPath        = initialFormPhotoPath;
+        updateFormPhotoUi(formPhotoPath);
+
+        btnTake.setOnClickListener(v -> onFormTakePhotoClicked());
+        formBtnRemovePhoto.setOnClickListener(v -> {
+            // Pengguna melepas foto profil
+            if (formPhotoPath != null && !formPhotoPath.equals(initialFormPhotoPath)) {
+                ImageUtils.deleteQuietly(formPhotoPath);
+            }
+            formPhotoPath = null;
+            updateFormPhotoUi(null);
+        });
+
         addClearErrorWatcher(etNama, tilNama);
         addClearErrorWatcher(etNim, tilNim);
         addClearErrorWatcher(etNoHp, tilNoHp);
         addClearErrorWatcher(etJurusan, tilJurusan);
         addClearErrorWatcher(etAngkatan, tilAngkatan);
 
-        // Jika mode edit, pra-isi field form secara lengkap
+        etNama.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
+                if (formPhotoPath == null && formInitialView != null) {
+                    String str = s != null ? s.toString().trim() : "";
+                    formInitialView.setText(!str.isEmpty() ? str.substring(0, 1).toUpperCase() : "M");
+                }
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
+
         if (isEdit) {
             tvSubtitle.setText("Perbarui informasi kontak mahasiswa di bawah ini lalu klik Simpan.");
             etNama.setText(existingMhs.getNama());
@@ -229,8 +300,14 @@ public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.
                 .setTitle(isEdit ? R.string.title_edit_mhs : R.string.title_add_mhs)
                 .setView(viewInput)
                 .setCancelable(false)
-                .setPositiveButton(R.string.btn_save, null) // Diset manual agar tidak otomatis dismiss saat validasi gagal
-                .setNegativeButton(R.string.dialog_no, (d, w) -> d.dismiss())
+                .setPositiveButton(R.string.btn_save, null)
+                .setNegativeButton(R.string.dialog_no, (d, w) -> {
+                    // Batalkan: hapus foto baru jika belum disimpan
+                    if (formPhotoPath != null && !formPhotoPath.equals(initialFormPhotoPath)) {
+                        ImageUtils.deleteQuietly(formPhotoPath);
+                    }
+                    d.dismiss();
+                })
                 .create();
 
         dialog.setOnShowListener(dialogInterface -> {
@@ -277,9 +354,13 @@ public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.
                     return;
                 }
 
-                // â”€â”€ Operasi SQLite (DB Dulu, Baru Tampilan) â”€â”€
+                // Jika foto lama diganti, hapus file foto lama
+                if (initialFormPhotoPath != null && !initialFormPhotoPath.equals(formPhotoPath)) {
+                    ImageUtils.deleteQuietly(initialFormPhotoPath);
+                }
+
                 if (isEdit) {
-                    int rows = repository.update(existingMhs.getId(), nama, nim, nohp, jurusan, angkatan);
+                    int rows = repository.update(existingMhs.getId(), nama, nim, nohp, jurusan, angkatan, formPhotoPath);
                     if (rows > 0) {
                         Toast.makeText(MainActivity.this, R.string.toast_update_success, Toast.LENGTH_SHORT).show();
                         muatDataDariDatabase();
@@ -291,7 +372,7 @@ public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.
                         Toast.makeText(MainActivity.this, R.string.toast_update_failed, Toast.LENGTH_SHORT).show();
                     }
                 } else {
-                    long newId = repository.insert(nama, nim, nohp, jurusan, angkatan);
+                    long newId = repository.insert(nama, nim, nohp, jurusan, angkatan, formPhotoPath);
                     if (newId != -1) {
                         Toast.makeText(MainActivity.this, R.string.toast_save_success, Toast.LENGTH_SHORT).show();
                         muatDataDariDatabase();
@@ -307,49 +388,104 @@ public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.
         dialog.show();
     }
 
-    /**
-     * Dialog Aksi Kontak saat item baris diklik (Panggil, SMS, Edit, Hapus).
-     */
+    private void updateFormPhotoUi(String path) {
+        if (formImageView == null || formInitialView == null) return;
+        if (ImageUtils.isValidPhoto(path)) {
+            Bitmap bm = ImageUtils.decodeSampled(path, 192, 192);
+            if (bm != null) {
+                formImageView.setImageBitmap(bm);
+                formImageView.setVisibility(View.VISIBLE);
+                formInitialView.setVisibility(View.GONE);
+                if (formBtnRemovePhoto != null) formBtnRemovePhoto.setVisibility(View.VISIBLE);
+                return;
+            }
+        }
+        formImageView.setVisibility(View.GONE);
+        formInitialView.setVisibility(View.VISIBLE);
+        if (formBtnRemovePhoto != null) formBtnRemovePhoto.setVisibility(View.GONE);
+    }
+
+    private void onFormTakePhotoClicked() {
+        if (CameraPermissionHelper.hasCameraPermission(this)) {
+            launchFormCamera();
+        } else if (CameraPermissionHelper.shouldShowRationale(this)) {
+            CameraPermissionHelper.showRationaleDialog(this, () ->
+                    formPermissionLauncher.launch(Manifest.permission.CAMERA));
+        } else {
+            formPermissionLauncher.launch(Manifest.permission.CAMERA);
+        }
+    }
+
+    private void launchFormCamera() {
+        try {
+            File photo = ImageUtils.createImageFile(this);
+            // hapus temporary sebelumnya bila ada
+            if (formPhotoPath != null && !formPhotoPath.equals(initialFormPhotoPath)) {
+                ImageUtils.deleteQuietly(formPhotoPath);
+            }
+            formPhotoPath = photo.getAbsolutePath();
+            Uri uri = ImageUtils.getUriForFile(this, photo);
+            formCameraLauncher.launch(uri);
+        } catch (IOException e) {
+            Toast.makeText(this, "Gagal menyiapkan file foto: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    // ---------------------------------------------------------------- Dialog Profil Detail
+
     public void showDetailActionDialog(final Mahasiswa mhs) {
         View viewDetail = LayoutInflater.from(this).inflate(R.layout.dialog_detail_mahasiswa, null);
 
-        TextView tvAvatar  = viewDetail.findViewById(R.id.tv_detail_avatar);
-        TextView tvNama    = viewDetail.findViewById(R.id.tv_detail_nama);
-        TextView tvNim     = viewDetail.findViewById(R.id.tv_detail_nim);
-        TextView tvSub     = viewDetail.findViewById(R.id.tv_detail_sub);
-        TextView tvNoHp    = viewDetail.findViewById(R.id.tv_detail_nohp);
+        TextView tvAvatar            = viewDetail.findViewById(R.id.tv_detail_avatar);
+        ShapeableImageView ivDetailFoto = viewDetail.findViewById(R.id.iv_detail_foto);
+        TextView tvNama              = viewDetail.findViewById(R.id.tv_detail_nama);
+        TextView tvNim               = viewDetail.findViewById(R.id.tv_detail_nim);
+        TextView tvSub               = viewDetail.findViewById(R.id.tv_detail_sub);
+        TextView tvNoHp              = viewDetail.findViewById(R.id.tv_detail_nohp);
+
+        // Tampilkan foto kamera jika ada, atau monogram fallback
+        if (ImageUtils.isValidPhoto(mhs.getFotoPath())) {
+            Bitmap bm = ImageUtils.decodeSampled(mhs.getFotoPath(), 256, 256);
+            if (bm != null) {
+                ivDetailFoto.setImageBitmap(bm);
+                ivDetailFoto.setVisibility(View.VISIBLE);
+                tvAvatar.setVisibility(View.GONE);
+            } else {
+                ivDetailFoto.setVisibility(View.GONE);
+                tvAvatar.setVisibility(View.VISIBLE);
+            }
+        } else {
+            ivDetailFoto.setVisibility(View.GONE);
+            tvAvatar.setVisibility(View.VISIBLE);
+        }
 
         if (mhs.getNama() != null && !mhs.getNama().trim().isEmpty()) {
             tvAvatar.setText(mhs.getNama().trim().substring(0, 1).toUpperCase());
         }
         tvNama.setText(mhs.getNama());
         tvNim.setText("NRP: " + mhs.getNim());
-        tvSub.setText(mhs.getJurusan() + " • Angkatan " + mhs.getAngkatan());
+        tvSub.setText(mhs.getJurusan() + " â€¢ Angkatan " + mhs.getAngkatan());
         tvNoHp.setText(mhs.getNohp());
 
         AlertDialog detailDialog = new MaterialAlertDialogBuilder(this)
                 .setView(viewDetail)
                 .create();
 
-        // Tombol Aksi Telepon
         viewDetail.findViewById(R.id.btn_action_call).setOnClickListener(v -> {
             detailDialog.dismiss();
             makePhoneCall(mhs);
         });
 
-        // Tombol Aksi SMS
         viewDetail.findViewById(R.id.btn_action_message).setOnClickListener(v -> {
             detailDialog.dismiss();
             sendSmsMessage(mhs);
         });
 
-        // Tombol Edit Kontak
         viewDetail.findViewById(R.id.btn_action_edit).setOnClickListener(v -> {
             detailDialog.dismiss();
             showFormDialog(mhs);
         });
 
-        // Tombol Hapus
         viewDetail.findViewById(R.id.btn_action_delete).setOnClickListener(v -> {
             detailDialog.dismiss();
             showDeleteConfirmationDialog(mhs);
@@ -358,15 +494,17 @@ public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.
         detailDialog.show();
     }
 
-    /**
-     * Dialog Konfirmasi Hapus Data SQLite (P5 Section 11).
-     */
+    // ---------------------------------------------------------------- Dialog Hapus Kontak
+
     public void showDeleteConfirmationDialog(final Mahasiswa mhs) {
         String msg = getString(R.string.dialog_delete_message, mhs.getNama(), mhs.getNim());
         new MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.dialog_delete_title)
                 .setMessage(msg)
                 .setPositiveButton(R.string.dialog_yes, (d, w) -> {
+                    // Hapus file foto dari disk bila ada
+                    ImageUtils.deleteQuietly(mhs.getFotoPath());
+
                     int rows = repository.delete(mhs.getId());
                     if (rows > 0) {
                         Toast.makeText(this, R.string.toast_delete_success, Toast.LENGTH_SHORT).show();
@@ -450,6 +588,10 @@ public class MainActivity extends AppCompatActivity implements MahasiswaAdapter.
             return true;
         } else if (id == R.id.action_sort_nim_asc) {
             setSortOrder("nim_asc");
+            return true;
+        } else if (id == R.id.action_camera_lab) {
+            // Demo interaktif Materi Android Kamera
+            startActivity(new Intent(this, CameraLabActivity.class));
             return true;
         }
         return super.onOptionsItemSelected(item);

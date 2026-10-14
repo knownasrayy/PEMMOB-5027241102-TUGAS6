@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Tugas 5 - LIST VIEW"
+rootProject.name = "Tugas 6 - Android Kamera"
 include(":app")

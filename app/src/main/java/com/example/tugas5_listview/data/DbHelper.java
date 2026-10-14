@@ -12,7 +12,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 public class DbHelper extends SQLiteOpenHelper {
 
     public static final String DATABASE_NAME    = "kontak_mahasiswa_v2.db";
-    public static final int    DATABASE_VERSION = 2;
+    public static final int    DATABASE_VERSION = 3;
 
     public static final String TABLE_MAHASISWA  = "mahasiswa";
     public static final String COL_ID           = "_id"; // Sesuai konvensi P5
@@ -22,6 +22,7 @@ public class DbHelper extends SQLiteOpenHelper {
     public static final String COL_JURUSAN      = "jurusan";
     public static final String COL_ANGKATAN     = "angkatan";
     public static final String COL_TIMESTAMP    = "timestamp";
+    public static final String COL_FOTO         = "foto_path"; // path file foto profil dari kamera (nullable)
 
     private static final String SQL_CREATE_TABLE =
             "CREATE TABLE IF NOT EXISTS " + TABLE_MAHASISWA + " (" +
@@ -31,6 +32,7 @@ public class DbHelper extends SQLiteOpenHelper {
             COL_NOHP      + " TEXT NOT NULL, " +
             COL_JURUSAN   + " TEXT NOT NULL, " +
             COL_ANGKATAN  + " INTEGER NOT NULL, " +
+            COL_FOTO      + " TEXT, " +
             COL_TIMESTAMP + " DATETIME DEFAULT CURRENT_TIMESTAMP" +
             ")";
 
@@ -51,7 +53,9 @@ public class DbHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_MAHASISWA);
-        onCreate(db);
+        // Migrasi bertahap: data lama tetap aman (tidak lagi DROP TABLE)
+        if (oldVersion < 3) {
+            db.execSQL("ALTER TABLE " + TABLE_MAHASISWA + " ADD COLUMN " + COL_FOTO + " TEXT");
+        }
     }
 }

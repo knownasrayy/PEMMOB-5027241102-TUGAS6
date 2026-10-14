@@ -32,4 +32,11 @@
         </menu>
     </item>
 
+    <!-- Demo Materi Android Kamera -->
+    <item
+        android:id="@+id/action_camera_lab"
+        android:title="@string/menu_camera_lab"
+        android:icon="@drawable/ic_camera"
+        app:showAsAction="never" />
+
 </menu>

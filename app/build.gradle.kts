@@ -9,7 +9,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.tugas5_listview"
+        applicationId = "com.example.tugas6_kamera"
         minSdk = 24
         targetSdk = 37
         versionCode = 1
@@ -38,6 +38,11 @@ dependencies {
     implementation(libs.material)
     implementation(libs.recyclerview)
     implementation(libs.cardview)
+    // CameraX (pengganti modern Camera / Camera2 API) - Materi Bagian 11-12
+    implementation(libs.camera.core)
+    implementation(libs.camera.camera2)
+    implementation(libs.camera.lifecycle)
+    implementation(libs.camera.view)
     testImplementation(libs.junit)
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.ext.junit)

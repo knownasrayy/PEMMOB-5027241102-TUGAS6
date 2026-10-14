@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -107,7 +107,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="Mini-Project P5 • ListView &amp; SQLite Integration"
+                        android:text="Praktikum P6 &#8226; Modul Kamera &amp; SQLite"
                         android:textSize="13sp"
                         android:textColor="#DCE6F5" />
 

@@ -2,6 +2,26 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Kamera tidak wajib ada agar app tetap bisa dipasang di perangkat tanpa kamera -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
+    <!-- Runtime permission kamera (Materi Bagian 8 dan 14) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Hanya dibutuhkan API 24-28 untuk menyalin foto ke Galeri (Scoped Storage mulai API 29) -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <!-- Package visibility (API 30+): izinkan resolveActivity() menemukan aplikasi kamera -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -23,6 +43,31 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Lab Kamera: demo konsep Materi Android Kamera (Intent, EXTRA_OUTPUT, Galeri) -->
+        <activity
+            android:name=".ui.CameraLabActivity"
+            android:exported="true"
+            android:label="Lab Kamera"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- CameraX: pengganti modern Camera / Camera2 API (Materi Bagian 11-12) -->
+        <activity
+            android:name=".ui.CameraXActivity"
+            android:exported="true"
+            android:label="CameraX Live Preview"
+            android:parentActivityName=".ui.CameraLabActivity" />
+
+        <!-- FileProvider: pengganti Uri.fromFile() agar tidak FileUriExposedException (Materi Bagian 14) -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 

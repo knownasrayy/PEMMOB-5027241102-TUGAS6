@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Foto kamera disimpan di Android/data/<package>/files/Pictures/ (ramah Scoped Storage) -->
+    <external-files-path name="foto_kamera" path="Pictures/" />
+    <!-- Cadangan bila penyimpanan eksternal tidak tersedia -->
+    <files-path name="foto_internal" path="Pictures/" />
+</paths>

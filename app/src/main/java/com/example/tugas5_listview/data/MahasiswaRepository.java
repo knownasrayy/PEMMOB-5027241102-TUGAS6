@@ -46,7 +46,7 @@ public class MahasiswaRepository {
     }
 
     // â”€â”€ CREATE â”€â”€
-    public synchronized long insert(String nama, String nim, String nohp, String jurusan, int angkatan) {
+    public synchronized long insert(String nama, String nim, String nohp, String jurusan, int angkatan, String fotoPath) {
         ensureOpen();
         try {
             ContentValues cv = new ContentValues();
@@ -55,6 +55,11 @@ public class MahasiswaRepository {
             cv.put(DbHelper.COL_NOHP, nohp);
             cv.put(DbHelper.COL_JURUSAN, jurusan);
             cv.put(DbHelper.COL_ANGKATAN, angkatan);
+            if (fotoPath != null) {
+                cv.put(DbHelper.COL_FOTO, fotoPath);
+            } else {
+                cv.putNull(DbHelper.COL_FOTO);
+            }
             long id = db.insert(DbHelper.TABLE_MAHASISWA, null, cv);
             Log.d(TAG, "Insert record result ID: " + id);
             return id;
@@ -87,6 +92,7 @@ public class MahasiswaRepository {
                     + DbHelper.COL_NOHP + ", "
                     + DbHelper.COL_JURUSAN + ", "
                     + DbHelper.COL_ANGKATAN + ", "
+                    + DbHelper.COL_FOTO + ", "
                     + "datetime(" + DbHelper.COL_TIMESTAMP + ", 'localtime') AS ts "
                     + "FROM " + DbHelper.TABLE_MAHASISWA + " "
                     + "ORDER BY " + orderBy,
@@ -122,6 +128,7 @@ public class MahasiswaRepository {
                     + DbHelper.COL_NOHP + ", "
                     + DbHelper.COL_JURUSAN + ", "
                     + DbHelper.COL_ANGKATAN + ", "
+                    + DbHelper.COL_FOTO + ", "
                     + "datetime(" + DbHelper.COL_TIMESTAMP + ", 'localtime') AS ts "
                     + "FROM " + DbHelper.TABLE_MAHASISWA + " "
                     + "WHERE " + DbHelper.COL_ID + " = ?",
@@ -167,6 +174,7 @@ public class MahasiswaRepository {
                     + DbHelper.COL_NOHP + ", "
                     + DbHelper.COL_JURUSAN + ", "
                     + DbHelper.COL_ANGKATAN + ", "
+                    + DbHelper.COL_FOTO + ", "
                     + "datetime(" + DbHelper.COL_TIMESTAMP + ", 'localtime') AS ts "
                     + "FROM " + DbHelper.TABLE_MAHASISWA + " "
                     + "WHERE " + DbHelper.COL_NAMA + " LIKE ? "
@@ -195,7 +203,7 @@ public class MahasiswaRepository {
     }
 
     // â”€â”€ UPDATE â”€â”€
-    public synchronized int update(long id, String nama, String nim, String nohp, String jurusan, int angkatan) {
+    public synchronized int update(long id, String nama, String nim, String nohp, String jurusan, int angkatan, String fotoPath) {
         ensureOpen();
         try {
             ContentValues cv = new ContentValues();
@@ -204,6 +212,11 @@ public class MahasiswaRepository {
             cv.put(DbHelper.COL_NOHP, nohp);
             cv.put(DbHelper.COL_JURUSAN, jurusan);
             cv.put(DbHelper.COL_ANGKATAN, angkatan);
+            if (fotoPath != null) {
+                cv.put(DbHelper.COL_FOTO, fotoPath);
+            } else {
+                cv.putNull(DbHelper.COL_FOTO);
+            }
             int rows = db.update(
                     DbHelper.TABLE_MAHASISWA,
                     cv,
@@ -243,6 +256,7 @@ public class MahasiswaRepository {
         m.setNohp(cursor.getString(cursor.getColumnIndexOrThrow(DbHelper.COL_NOHP)));
         m.setJurusan(cursor.getString(cursor.getColumnIndexOrThrow(DbHelper.COL_JURUSAN)));
         m.setAngkatan(cursor.getInt(cursor.getColumnIndexOrThrow(DbHelper.COL_ANGKATAN)));
+        m.setFotoPath(cursor.getString(cursor.getColumnIndexOrThrow(DbHelper.COL_FOTO)));
         m.setTimestamp(cursor.getString(cursor.getColumnIndexOrThrow("ts")));
         return m;
     }
